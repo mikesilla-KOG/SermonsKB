@@ -1,0 +1,11 @@
+yt-dlp
+youtube-transcript-api
+streamlit
+python-dotenv
+tqdm
+faiss-cpu
+sentence-transformers
+openai
+ffmpeg-python
+pydub
+requests

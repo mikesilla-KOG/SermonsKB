@@ -1,0 +1,15 @@
+# Secrets and environment
+client_secret.json
+token.json
+.env
+
+# Python
+__pycache__/
+.venv/
+*.py[cod]
+
+# Database
+*.db
+
+# Streamlit cached files
+.streamlit/
