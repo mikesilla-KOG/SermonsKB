@@ -27,6 +27,7 @@ load_dotenv()
 
 DB_PATH = os.getenv('DB_PATH', 'sermons.db')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+LOCAL_WHISPER_MODEL = os.getenv('LOCAL_WHISPER_MODEL', 'tiny')
 
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
@@ -109,6 +110,25 @@ def transcribe_with_openai(audio_file_path):
         print("OpenAI transcription error:", e)
         return None
 
+def transcribe_with_whisper(audio_file_path, model_name=LOCAL_WHISPER_MODEL):
+    """Try to transcribe using a local Whisper model (openai/whisper).
+    Returns the transcribed text or None on failure.
+    """
+    try:
+        import whisper
+    except Exception as e:
+        print("Local Whisper not available (install 'whisper' package):", e)
+        return None
+    try:
+        print(f"Loading Whisper model '{model_name}' (this may take a while)...")
+        model = whisper.load_model(model_name)
+        print("Transcribing with Whisper...")
+        res = model.transcribe(audio_file_path)
+        return res.get('text')
+    except Exception as e:
+        print("Whisper transcription error:", e)
+        return None
+
 def chunk_text(text, size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
     chunks = []
     start = 0
@@ -132,6 +152,19 @@ def insert_into_db(conn, video_id, title, published_at, transcript):
         for chunk in chunk_text(transcript):
             c.execute("INSERT INTO chunks(video_id, chunk_text) VALUES (?, ?)", (video_id, chunk))
     conn.commit()
+    # also save raw transcript to file for backup/inspection
+    try:
+        os.makedirs('data/transcripts', exist_ok=True)
+        out = {
+            'video_id': video_id,
+            'title': title,
+            'published_at': published_at,
+            'transcript': transcript
+        }
+        with open(os.path.join('data', 'transcripts', f"{video_id}.json"), 'w', encoding='utf-8') as f:
+            json.dump(out, f, ensure_ascii=False)
+    except Exception as e:
+        print('Failed to save transcript file:', e)
 
 def main():
     if len(sys.argv) < 2:
