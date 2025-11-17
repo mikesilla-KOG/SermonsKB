@@ -12,8 +12,13 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 def try_transcript(video_id):
     print('Testing video:', video_id)
     try:
-        t = YouTubeTranscriptApi.get_transcript(video_id)
-        text = ' '.join(s['text'] for s in t)
+        api = YouTubeTranscriptApi()
+        segs = api.fetch(video_id)
+        # handle both typed snippets and dicts
+        try:
+            text = ' '.join(getattr(s, 'text', s.get('text')) for s in segs)
+        except Exception:
+            text = ' '.join(s.get('text', '') for s in segs)
         print('Found transcript length:', len(text))
         return True
     except Exception as e:

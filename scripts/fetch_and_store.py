@@ -18,6 +18,7 @@ import json
 import sqlite3
 import tempfile
 import subprocess
+import shlex
 from tqdm import tqdm
 from youtube_transcript_api import YouTubeTranscriptApi
 import requests
@@ -44,6 +45,13 @@ def get_video_ids_from_url(url):
     # Use yt-dlp to get flat playlist JSON and extract ids
     try:
         cmd = ["yt-dlp", "--flat-playlist", "-J", url]
+        # allow additional args (like Invidious extractor) via env var
+        extra = os.getenv('YTDLP_EXTRACTOR_ARGS')
+        if extra:
+            try:
+                cmd += shlex.split(extra)
+            except Exception:
+                cmd.append(extra)
         cookies = os.getenv('YTDLP_COOKIES')
         if cookies:
             cmd[1:1] = ["--cookies", cookies]
@@ -58,6 +66,12 @@ def get_video_ids_from_url(url):
 def fetch_meta(video_id):
     try:
         cmd = ["yt-dlp", "-j", f"https://www.youtube.com/watch?v={video_id}"]
+        extra = os.getenv('YTDLP_EXTRACTOR_ARGS')
+        if extra:
+            try:
+                cmd += shlex.split(extra)
+            except Exception:
+                cmd.append(extra)
         cookies = os.getenv('YTDLP_COOKIES')
         if cookies:
             cmd[1:1] = ["--cookies", cookies]
@@ -67,11 +81,61 @@ def fetch_meta(video_id):
         return {}
 
 def fetch_transcript_youtube_api(video_id):
+    """
+    Try youtube-transcript-api first, fall back to yt-dlp subtitles if blocked
+    """
+    # Try youtube-transcript-api (fast but may be IP blocked)
     try:
-        segs = YouTubeTranscriptApi.get_transcript(video_id)
-        return " ".join(s['text'] for s in segs)
+        api = YouTubeTranscriptApi()
+        segs = api.fetch(video_id)
+        try:
+            return " ".join(getattr(s, 'text', s.get('text')) for s in segs)
+        except Exception:
+            return " ".join(s.get('text', '') for s in segs)
     except Exception:
-        return None
+        pass
+    
+    # Fall back to yt-dlp with cookies (slower but bypasses IP blocks)
+    try:
+        cmd = ["yt-dlp", "--skip-download", "--write-auto-sub", "--sub-lang", "en", 
+               "--convert-subs", "json", "-o", "%(id)s", f"https://www.youtube.com/watch?v={video_id}"]
+        
+        extra = os.getenv('YTDLP_EXTRACTOR_ARGS')
+        if extra:
+            try:
+                cmd += shlex.split(extra)
+            except Exception:
+                cmd.append(extra)
+        
+        cookies = os.getenv('YTDLP_COOKIES')
+        if cookies:
+            cmd[1:1] = ["--cookies", cookies]
+        
+        # Run yt-dlp to download subtitles
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_cwd = os.getcwd()
+            os.chdir(tmpdir)
+            try:
+                subprocess.run(cmd, check=True, capture_output=True)
+                # Find the subtitle file
+                subtitle_file = f"{video_id}.en.json"
+                if os.path.exists(subtitle_file):
+                    with open(subtitle_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        # Extract text from events
+                        texts = []
+                        for event in data.get('events', []):
+                            for seg in event.get('segs', []):
+                                if 'utf8' in seg:
+                                    texts.append(seg['utf8'])
+                        return ' '.join(texts).strip()
+            finally:
+                os.chdir(old_cwd)
+    except Exception as e:
+        print(f"yt-dlp subtitle fetch failed: {e}")
+    
+    return None
 
 def download_audio(video_id, dest_path):
     # Uses yt-dlp to extract audio to dest_path (mp3)
@@ -79,6 +143,12 @@ def download_audio(video_id, dest_path):
         cmd = [
             "yt-dlp", "-x", "--audio-format", "mp3", "-o", dest_path, f"https://www.youtube.com/watch?v={video_id}"
         ]
+        extra = os.getenv('YTDLP_EXTRACTOR_ARGS')
+        if extra:
+            try:
+                cmd += shlex.split(extra)
+            except Exception:
+                cmd.append(extra)
         cookies = os.getenv('YTDLP_COOKIES')
         if cookies:
             cmd[1:1] = ["--cookies", cookies]
