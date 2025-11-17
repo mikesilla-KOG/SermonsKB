@@ -81,7 +81,8 @@ def fetch_transcript_youtube_api(video_id):
             elif isinstance(s, dict):
                 out_parts.append(s.get('text', ''))
         return " ".join(out_parts)
-    except Exception:
+    except Exception as e:
+        print(f"YouTube API error for {video_id}: {e}")
         return None
 
 
