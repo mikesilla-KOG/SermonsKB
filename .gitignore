@@ -1,6 +1,7 @@
 # Secrets and environment
 client_secret.json
 token.json
+google-credentials.json
 .env
 
 # Python

@@ -89,7 +89,9 @@ def fetch_transcript_youtube_api(video_id):
 def download_audio(video_id, dest_path):
     try:
         cmd = [
-            "yt-dlp", "-x", "--audio-format", "mp3", "-o", dest_path, f"https://www.youtube.com/watch?v={video_id}"
+            "yt-dlp", "-x", "--audio-format", "mp3", 
+            "--extractor-args", "youtube:player_client=default",
+            "-o", dest_path, f"https://www.youtube.com/watch?v={video_id}"
         ]
         cookies = os.getenv('YTDLP_COOKIES')
         if cookies:
@@ -101,8 +103,16 @@ def download_audio(video_id, dest_path):
                 cmd += shlex.split(extra)
             except Exception:
                 cmd.append(extra)
-        subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Run download (suppress output to keep logs clean)
+        print(f"Downloading audio for {video_id}...")
+        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=300)
+        if result.returncode != 0:
+            print(f"yt-dlp failed for {video_id}")
+            return False
         return True
+    except subprocess.TimeoutExpired:
+        print(f"Audio download timed out for {video_id}")
+        return False
     except Exception as e:
         print(f"Audio download failed for {video_id}: {e}")
         return False
@@ -130,23 +140,34 @@ def transcribe_with_openai(audio_file_path):
 
 
 def transcribe_with_google_speech(audio_file_path):
-    """Transcribe audio using Google Cloud Speech-to-Text API"""
-    if not GOOGLE_APPLICATION_CREDENTIALS:
+    """Transcribe audio using Google Cloud Speech-to-Text API with GCS bucket upload"""
+    if not GOOGLE_APPLICATION_CREDENTIALS or not GOOGLE_CLOUD_BUCKET:
         return None
     
     try:
         from google.cloud import speech
+        from google.cloud import storage
     except ImportError:
-        print("google-cloud-speech not installed, skipping...")
+        print("google-cloud-speech or google-cloud-storage not installed, skipping...")
         return None
     
     try:
-        client = speech.SpeechClient()
+        # Initialize clients
+        speech_client = speech.SpeechClient()
+        storage_client = storage.Client()
         
-        with open(audio_file_path, 'rb') as f:
-            content = f.read()
+        # Upload audio to GCS bucket
+        bucket = storage_client.bucket(GOOGLE_CLOUD_BUCKET)
+        blob_name = f"sermons-temp/{os.path.basename(audio_file_path)}"
+        blob = bucket.blob(blob_name)
         
-        audio = speech.RecognitionAudio(content=content)
+        print(f"Uploading to gs://{GOOGLE_CLOUD_BUCKET}/{blob_name}...")
+        blob.upload_from_filename(audio_file_path)
+        gcs_uri = f"gs://{GOOGLE_CLOUD_BUCKET}/{blob_name}"
+        print(f"Upload complete: {gcs_uri}")
+        
+        # Configure recognition with GCS URI
+        audio = speech.RecognitionAudio(uri=gcs_uri)
         config = speech.RecognitionConfig(
             encoding=speech.RecognitionConfig.AudioEncoding.MP3,
             sample_rate_hertz=16000,
@@ -156,8 +177,15 @@ def transcribe_with_google_speech(audio_file_path):
         )
         
         print("Transcribing with Google Speech API...")
-        operation = client.long_running_recognize(config=config, audio=audio)
+        operation = speech_client.long_running_recognize(config=config, audio=audio)
         response = operation.result(timeout=600)
+        
+        # Clean up GCS file
+        try:
+            blob.delete()
+            print("Cleaned up temporary GCS file")
+        except Exception as e:
+            print(f"Warning: Could not delete GCS file: {e}")
         
         transcript = " ".join([result.alternatives[0].transcript for result in response.results])
         return transcript.strip()

@@ -5,6 +5,7 @@ Transcribe audio using Google Cloud Speech-to-Text API
 import os
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 def transcribe_with_google_speech(audio_file_path):
@@ -57,7 +58,20 @@ def transcribe_with_google_speech(audio_file_path):
         
         print("Transcribing with Google Speech API (this may take a few minutes)...")
         operation = speech_client.long_running_recognize(config=config, audio=audio)
-        response = operation.result(timeout=600)
+        
+        # Wait for operation with progress updates
+        print("Waiting for transcription to complete...", end='', flush=True)
+        start_time = time.time()
+        while not operation.done():
+            time.sleep(5)
+            elapsed = int(time.time() - start_time)
+            print(f"\rWaiting for transcription to complete... {elapsed}s elapsed", end='', flush=True)
+            if elapsed > 600:  # 10 minute timeout
+                print("\n⚠️  Transcription timeout after 10 minutes")
+                return None
+        
+        print("\n✅ Transcription complete!")
+        response = operation.result()
         
         # Clean up GCS file
         try:
@@ -98,7 +112,25 @@ def download_and_transcribe_google(video_id):
                 cmd[1:1] = ["--cookies", cookies]
             
             print(f"Downloading audio for {video_id}...")
-            subprocess.run(cmd, check=True)
+            # Run with retries to handle interruptions
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    result = subprocess.run(cmd, check=False, capture_output=False)
+                    if result.returncode == 0:
+                        break
+                    elif attempt < max_retries - 1:
+                        print(f"Download attempt {attempt + 1} failed, retrying...")
+                        time.sleep(2)
+                    else:
+                        print(f"Download failed after {max_retries} attempts")
+                        return None
+                except (KeyboardInterrupt, Exception) as e:
+                    if isinstance(e, KeyboardInterrupt) and attempt < max_retries - 1:
+                        print(f"Interrupted during attempt {attempt + 1}, retrying...")
+                        time.sleep(1)
+                        continue
+                    raise
             
             # Find the downloaded file
             audio_file = None
