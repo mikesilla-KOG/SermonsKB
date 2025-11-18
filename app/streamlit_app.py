@@ -26,6 +26,9 @@ embed_css = """
     footer {visibility: hidden;}
     .stDeployButton {display: none;}
     
+    /* Hide sidebar in embed mode */
+    [data-testid="stSidebar"] {display: none;}
+    
     /* Reduce padding in embed mode */
     .main > div {
         padding-top: 2rem;
@@ -123,36 +126,42 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 st.markdown("<h1 style='text-align: center; font-size: 3.5em; margin-bottom: 10px;'>📖 SermonsKB</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #6c757d; font-size: 20px; margin-bottom: 30px;'>Discover Biblical Wisdom Through AI-Powered Search</p>", unsafe_allow_html=True)
 
-# Sidebar
-with st.sidebar:
+# Mode selector - show in main area if embedded, otherwise in sidebar
+if is_embedded:
     st.markdown("### 🔍 Search Mode")
-    tab = st.radio('Search Mode', ['AI Chat', 'Semantic Search', 'Keyword Search'], label_visibility="collapsed")
-    
+    tab = st.radio('Search Mode', ['AI Chat', 'Semantic Search', 'Keyword Search'], horizontal=True, label_visibility="collapsed")
     st.markdown("---")
-    st.markdown("### 📊 Statistics")
-    
-    # Get stats
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('SELECT COUNT(*) FROM sermons')
-    total = c.fetchone()[0]
-    c.execute('SELECT COUNT(*) FROM sermons WHERE transcript IS NOT NULL AND LENGTH(transcript) > 0')
-    with_transcripts = c.fetchone()[0]
-    conn.close()
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Total Videos", total)
-    with col2:
-        st.metric("With Transcripts", with_transcripts)
-    
-    st.progress(with_transcripts / total if total > 0 else 0)
-    st.caption(f"{(with_transcripts/total*100):.1f}% Complete")
-    
-    st.markdown("---")
-    st.markdown("### ℹ️ About")
-    st.caption("Search through 636+ sermon transcripts using AI-powered semantic search and get intelligent answers to your questions.")
-    st.caption("Built with Streamlit, OpenAI, and FAISS.")
+else:
+    # Sidebar
+    with st.sidebar:
+        st.markdown("### 🔍 Search Mode")
+        tab = st.radio('Search Mode', ['AI Chat', 'Semantic Search', 'Keyword Search'], label_visibility="collapsed")
+        
+        st.markdown("---")
+        st.markdown("### 📊 Statistics")
+        
+        # Get stats
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute('SELECT COUNT(*) FROM sermons')
+        total = c.fetchone()[0]
+        c.execute('SELECT COUNT(*) FROM sermons WHERE transcript IS NOT NULL AND LENGTH(transcript) > 0')
+        with_transcripts = c.fetchone()[0]
+        conn.close()
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Total Videos", total)
+        with col2:
+            st.metric("With Transcripts", with_transcripts)
+        
+        st.progress(with_transcripts / total if total > 0 else 0)
+        st.caption(f"{(with_transcripts/total*100):.1f}% Complete")
+        
+        st.markdown("---")
+        st.markdown("### ℹ️ About")
+        st.caption("Search through 636+ sermon transcripts using AI-powered semantic search and get intelligent answers to your questions.")
+        st.caption("Built with Streamlit, OpenAI, and FAISS.")
 
 def keyword_search(q, limit=10):
     conn = sqlite3.connect(DB_PATH)
