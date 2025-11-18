@@ -280,7 +280,12 @@ else:  # AI Chat
                     prompt = f"""You are a helpful assistant that answers questions based on sermon transcripts. 
 Use the following sermon excerpts to answer the question. Be thorough and helpful, citing specific points from the sermons when relevant.
 
-IMPORTANT: When appropriate, include relevant Bible verses (with book, chapter, and verse references) to support the points made in the sermons. Quote the verses directly when they help illustrate or reinforce the sermon's message.
+CRITICAL INSTRUCTION: You MUST include multiple relevant Bible verses to support and reinforce your answer. For each verse:
+1. Provide the complete reference (e.g., John 3:16, Romans 8:28, Ephesians 2:8-9)
+2. Quote the full verse text
+3. Explain how it relates to the sermon content and the question
+
+Include at least 3-5 Bible verses in your response when relevant. Make the Scripture references prominent and easy to identify.
 
 If the sermons don't contain relevant information, say so honestly.
 
@@ -296,7 +301,7 @@ Answer:"""
                     data = {
                         "model": "gpt-4o-mini", 
                         "messages": [{"role": "user", "content": prompt}], 
-                        "max_tokens": 800,
+                        "max_tokens": 1200,
                         "temperature": 0.7
                     }
                     r = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
