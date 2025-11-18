@@ -10,7 +10,7 @@ __pycache__/
 *.py[cod]
 
 # Database
-*.db
+# *.db  # Commented out to allow sermons.db for deployment
 
 # Streamlit cached files
 .streamlit/
