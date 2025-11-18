@@ -132,15 +132,14 @@ FAISS_INDEX_PATH = os.getenv('FAISS_INDEX_PATH', 'faiss_index.faiss')
 EMBEDDINGS_META = os.getenv('EMBEDDINGS_META', 'embeddings_meta.json')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
-# Header
-st.markdown("<h1 style='text-align: center; font-size: 3.5em; margin-bottom: 10px;'>📖 SermonsKB</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #6c757d; font-size: 20px; margin-bottom: 30px;'>Discover Biblical Wisdom Through AI-Powered Search</p>", unsafe_allow_html=True)
+# Header - simpler in embed mode
+if not is_embedded:
+    st.markdown("<h1 style='text-align: center; font-size: 3.5em; margin-bottom: 10px;'>📖 SermonsKB</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #6c757d; font-size: 20px; margin-bottom: 30px;'>Discover Biblical Wisdom Through AI-Powered Search</p>", unsafe_allow_html=True)
 
 # Mode selector - show in main area if embedded, otherwise in sidebar
 if is_embedded:
-    st.markdown("### 🔍 Search Mode")
     tab = st.radio('Search Mode', ['AI Chat', 'Semantic Search', 'Keyword Search'], horizontal=True, label_visibility="collapsed")
-    st.markdown("---")
 else:
     # Sidebar
     with st.sidebar:
@@ -180,12 +179,13 @@ def keyword_search(q, limit=10):
     return cur.fetchall()
 
 if tab == 'Keyword Search':
-    st.markdown("### 🔎 Keyword Search")
-    st.caption("Fast full-text search across all sermon transcripts")
+    if not is_embedded:
+        st.markdown("### 🔎 Keyword Search")
+        st.caption("Fast full-text search across all sermon transcripts")
     
     col1, col2 = st.columns([4, 1])
     with col1:
-        q = st.text_input('Search keywords:', placeholder="e.g., faith, grace, salvation")
+        q = st.text_input('Search keywords:' if not is_embedded else '', placeholder="Search sermons...", label_visibility="collapsed" if is_embedded else "visible")
     with col2:
         limit = st.number_input('Results', 1, 50, 10, label_visibility="collapsed")
     
@@ -204,12 +204,13 @@ if tab == 'Keyword Search':
             ''', unsafe_allow_html=True)
 
 elif tab == 'Semantic Search':
-    st.markdown("### 🧠 Semantic Search")
-    st.caption("Find sermons by meaning, not just keywords")
+    if not is_embedded:
+        st.markdown("### 🧠 Semantic Search")
+        st.caption("Find sermons by meaning, not just keywords")
     
     col1, col2 = st.columns([4, 1])
     with col1:
-        query = st.text_input('Describe what you\'re looking for:', placeholder="e.g., overcoming challenges with faith")
+        query = st.text_input('Describe what you\'re looking for:' if not is_embedded else '', placeholder="Describe what you're looking for...", label_visibility="collapsed" if is_embedded else "visible")
     with col2:
         top_k = st.number_input('Results', 1, 20, 5, label_visibility="collapsed")
     
@@ -256,13 +257,14 @@ elif tab == 'Semantic Search':
                     ''', unsafe_allow_html=True)
 
 else:  # AI Chat
-    st.markdown("### 💬 Ask a Question")
-    st.markdown("Ask any question about the sermons and get AI-powered answers with sources.")
+    if not is_embedded:
+        st.markdown("### 💬 Ask a Question")
+        st.markdown("Ask any question about the sermons and get AI-powered answers with sources.")
     
     if not OPENAI_API_KEY:
         st.error('⚠️ OPENAI_API_KEY not set. AI Chat requires OpenAI API access.')
     else:
-        query = st.text_input('Your question:', placeholder="e.g., What does the Bible say about faith and works?")
+        query = st.text_input('Your question:' if not is_embedded else '', placeholder="Ask a question about the sermons...", label_visibility="collapsed" if is_embedded else "visible")
         
         col1, col2, col3 = st.columns([3, 1, 1])
         with col2:
