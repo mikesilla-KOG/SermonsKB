@@ -13,8 +13,27 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
-st.markdown("""
+# Check if running in embed mode
+query_params = st.query_params
+is_embedded = query_params.get("embed") == "true"
+
+# Custom CSS with embed mode support
+embed_css = """
+    <style>
+    /* Hide Streamlit branding and UI chrome in embed mode */
+    header {visibility: hidden;}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stDeployButton {display: none;}
+    
+    /* Reduce padding in embed mode */
+    .main > div {
+        padding-top: 2rem;
+    }
+    </style>
+""" if is_embedded else ""
+
+st.markdown(embed_css + """
     <style>
     .main {
         background: linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%);
