@@ -6,6 +6,4 @@ tqdm
 faiss-cpu
 sentence-transformers
 openai
-ffmpeg-python
-pydub
 requests
