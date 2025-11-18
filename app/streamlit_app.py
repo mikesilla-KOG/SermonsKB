@@ -21,13 +21,23 @@ is_embedded = query_params.get("embed") == "true"
 embed_css = """
     <style>
     /* Hide Streamlit branding and UI chrome in embed mode */
-    header {visibility: hidden;}
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    .stDeployButton {display: none;}
+    header {visibility: hidden !important;}
+    #MainMenu {visibility: hidden !important;}
+    footer {visibility: hidden !important;}
+    .stDeployButton {display: none !important;}
     
-    /* Hide sidebar in embed mode */
-    [data-testid="stSidebar"] {display: none;}
+    /* Hide sidebar in embed mode - multiple selectors for compatibility */
+    [data-testid="stSidebar"] {display: none !important;}
+    [data-testid="collapsedControl"] {display: none !important;}
+    section[data-testid="stSidebar"] {display: none !important;}
+    .css-1d391kg {display: none !important;}
+    
+    /* Expand main content to full width */
+    .main .block-container {
+        max-width: 100%;
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
     
     /* Reduce padding in embed mode */
     .main > div {
